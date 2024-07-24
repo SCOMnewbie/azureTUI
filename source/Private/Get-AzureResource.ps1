@@ -45,10 +45,12 @@
             }
         }
         'Type' {
-            $Payload = @{query = "resources | extend  replacedType=replace('microsoft.', '',type) | project id, name, type=replacedType, location, subscriptionId" }
+            # "microsoft.storage/storageaccounts","microsoft.keyvault/vaults"
+            $Payload = @{query = "resources | where ['type'] in ($SecondaryFilter) | extend  replacedType=replace('microsoft.', '',type) | project id, name, type=replacedType, location, subscriptionId" }
         }
         'Location' {
-            $Payload = @{query = "resources | extend  replacedType=replace('microsoft.', '',type) | project id, name, type=replacedType, location, subscriptionId" }
+            # "eastus","westeurope"
+            $Payload = @{query = "resources | where ['location'] in ($SecondaryFilter) | extend  replacedType=replace('microsoft.', '',type) | project id, name, type=replacedType, location, subscriptionId" }
         }
     }
 
@@ -65,7 +67,7 @@
 
         #$splat['Body'] = @{query = "resources | extend  replacedType=replace('microsoft.', '',type) | project id, name, type=replacedType, location, subscriptionId "} | ConvertTo-Json
         $splat['Body'] = $Payload | ConvertTo-Json
-        #$splat.Body
+        $splat.Body
 
         Invoke-RestMethod @Splat
     }

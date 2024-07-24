@@ -3,7 +3,7 @@ Function ConvertTo-DataTable {
     .SYNOPSIS
     This function convert a collection of objects to a System.Data.Datatable.
     .DESCRIPTION
-    This function convert a collection of objects to a System.Data.Datatable.
+    This function convert a collection of objects to a System.Data.Datatable. I've took this function from Jeff Hicks https://github.com/jdhitsolutions/PSConfEU2023/tree/main/TUI-Tools
     .PARAMETER InputObject
         Specify the InputObject to convert
     .EXAMPLE
