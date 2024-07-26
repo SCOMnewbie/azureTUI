@@ -26,7 +26,6 @@ function azureTUI {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
     [cmdletbinding()]
     param (
-        [parameter(mandatory)]
         [switch]$WAM,
         [parameter(mandatory)]
         [guid]$ClientId,
@@ -38,22 +37,38 @@ function azureTUI {
         $script:moduleversion = (Get-Module azureTUI).version.ToString()
 
         if ($WAM) {
-            Start-ThreadJob { 
-                    [Terminal.Gui.Application]::MainLoop.Invoke({
-                        $script:ARMToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource ARM -Permissions user_impersonation | ForEach-Object AccessToken
-                        $script:KeyVaultToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource Keyvault -Permissions user_impersonation | ForEach-Object AccessToken
-                        $script:StorageToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource Storage -Permissions user_impersonation | ForEach-Object AccessToken
-                    })
-           } -ArgumentList $ClientId, $TenantId
-            #$script:ARMToken = Get-EntraToken -WAMFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation | ForEach-Object AccessToken
-            #$script:KeyVaultToken = Get-EntraToken -WAMFlow -ClientId $clientId -TenantId $TenantId -Resource Keyvault -Permissions user_impersonation | ForEach-Object AccessToken
-            #$script:StorageToken = Get-EntraToken -WAMFlow -ClientId $clientId -TenantId $TenantId -Resource Storage -Permissions user_impersonation | ForEach-Object AccessToken
+            if ($IsWindows) {
+                # Use ThreadJob to avoid waiting several seconds on launch
+                Start-ThreadJob {
+                    $ARMToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource ARM -Permissions user_impersonation | ForEach-Object AccessToken
+                    [Environment]::SetEnvironmentVariable('ARMToken', $ARMToken)
+                } -ArgumentList $ClientId, $TenantId | Out-Null
+
+                Start-ThreadJob {
+                    $KeyVaultToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource Keyvault -Permissions user_impersonation | ForEach-Object AccessToken
+                    [Environment]::SetEnvironmentVariable('KeyVaultToken', $KeyVaultToken)
+                } -ArgumentList $ClientId, $TenantId | Out-Null
+
+                Start-ThreadJob {
+                    $StorageToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource Storage -Permissions user_impersonation | ForEach-Object AccessToken
+                    [Environment]::SetEnvironmentVariable('StorageToken', $StorageToken)
+                } -ArgumentList $ClientId, $TenantId | Out-Null
+
+                Start-ThreadJob {
+                    $GraphAPIToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource GraphAPI -Permissions @("user.read") | ForEach-Object AccessToken
+                    [Environment]::SetEnvironmentVariable('GraphAPIToken', $GraphAPIToken)
+                } -ArgumentList $ClientId, $TenantId | Out-Null
+            }
+            else{
+                Throw "WAM is available on Windows only!"
+            }
+
         }
         else {
             #Auth Code flow
-            $script:ARMToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation | ForEach-Object AccessToken
-            $script:KeyVaultToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Keyvault -Permissions user_impersonation | ForEach-Object AccessToken
-            $script:StorageToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Storage -Permissions user_impersonation | ForEach-Object AccessToken
+            $script:ARMToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
+            $script:KeyVaultToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Keyvault -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
+            $script:StorageToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Storage -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
         }
 
         Function resourceForm {
@@ -84,7 +99,7 @@ function azureTUI {
             # Get-AzureResources -AccessToken $ARMToken -PrimaryFilter Subcription -SecondaryFilter  "ede55c01-c21c-4aaa-bd47-4e3021a7b938,7c97d68a-0420-42d8-9b3b-761e42ca7db5"
 
             $splat = @{
-                AccessToken     = $script:ARMToken
+                AccessToken     = $([Environment]::GetEnvironmentVariable('ARMToken'))
                 PrimaryFilter   = $PrimaryFilter
                 SecondaryFilter = $SecondaryFilter
                 ErrorAction     = 'Stop'
@@ -251,6 +266,10 @@ function azureTUI {
         [Application]::Run()
     }
     end {
+        [Environment]::SetEnvironmentVariable('ARMToken','')
+        [Environment]::SetEnvironmentVariable('KeyVaultToken', '')
+        [Environment]::SetEnvironmentVariable('StorageToken', '')
+        [Environment]::SetEnvironmentVariable('GraphAPIToken', '')
         [Application]::ShutDown()
     }
 }
