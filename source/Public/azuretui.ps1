@@ -55,12 +55,12 @@ function azureTUI {
                 } -ArgumentList $ClientId, $TenantId | Out-Null
 
                 Start-ThreadJob {
-                    $GraphAPIToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource GraphAPI -Permissions @("user.read") | ForEach-Object AccessToken
+                    $GraphAPIToken = Get-EntraToken -WAMFlow -ClientId $args[0] -TenantId $args[1] -Resource GraphAPI -Permissions @('user.read') | ForEach-Object AccessToken
                     [Environment]::SetEnvironmentVariable('GraphAPIToken', $GraphAPIToken)
                 } -ArgumentList $ClientId, $TenantId | Out-Null
             }
-            else{
-                Throw "WAM is available on Windows only!"
+            else {
+                Throw 'WAM is available on Windows only!'
             }
 
         }
@@ -127,6 +127,20 @@ function azureTUI {
                 [Application]::Refresh()
             }
         }
+
+        function authTokenInfo {
+            @"
+ARM Token: $($([Environment]::GetEnvironmentVariable('ARMToken')) ? 'generated' : 'Not generated')
+KeyVault token: $($([Environment]::GetEnvironmentVariable('KeyvaultToken')) ? 'generated' : 'Not generated')
+Storage token: $($([Environment]::GetEnvironmentVariable('StorageToken')) ? 'generated' : 'Not generated')
+GraphAPI token: $($([Environment]::GetEnvironmentVariable('GraphAPIToken')) ? 'generated' : 'Not generated')
+Auth Mode: $($WAM ? 'WAM' : 'AuthCode')
+"@
+            [Application]::Refresh()
+        }
+
+        $TerminalGuiVersion = [System.Reflection.Assembly]::GetAssembly([application]).GetName().version
+        $NStackVersion = [System.Reflection.Assembly]::GetAssembly([nstack.ustring]).GetName().version
     }
     process {
         #region setup
@@ -155,6 +169,21 @@ function azureTUI {
         )
 
         [Application]::Top.add($StatusBar)
+        #endregion
+
+        #region help menu
+        $about = @"
+$($MyInvocation.MyCommand) v$($script:moduleversion)
+PSVersion $($PSVersionTable.PSVersion)
+Terminal.Gui $TerminalGuiVersion
+NStack $NStackVersion
+"@
+
+        $MenuItem3 = [MenuItem]::New('A_bout', '', { [MessageBox]::Query('About', $About) })
+        #[Terminal.Gui.Application]::MainLoop.AddTimeout([TimeSpan]::FromSeconds(10), { $aboutTokens } );
+        $MenuItem4 = [MenuItem]::New('_AuthInfos', '', { [MessageBox]::Query('AuthInfo', $(authTokenInfo)) })
+        $MenuBarItem2 = [MenuBarItem]::New('_Help', @($MenuItem3,$MenuItem4))
+
         #endregion
 
         #region resource form
@@ -258,7 +287,7 @@ function azureTUI {
         $MenuBarItem0 = [MenuBarItem]::New('_Options', @($MenuItem0, $MenuItem1))
 
 
-        $MenuBar = [MenuBar]::New(@($MenuBarItem0))
+        $MenuBar = [MenuBar]::New(@($MenuBarItem0,$MenuBarItem2))
         $Window.Add($MenuBar)
         #endregion
 
