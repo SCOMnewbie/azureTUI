@@ -292,6 +292,12 @@ NStack $NStackVersion
         #endregion
 
         [Application]::Top.Add($window)
+
+        $Green = [Color]::Green
+        $Black = [Color]::Black
+        [Colors]::Base.Normal = [Application]::Driver.MakeAttribute($Green,$Black)
+        [Colors]::Base.hotNormal = [Application]::Driver.MakeAttribute($Green,$Black)
+
         [Application]::Run()
     }
     end {
