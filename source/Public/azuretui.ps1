@@ -69,6 +69,7 @@ function azureTUI {
             $script:ARMToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
             $script:KeyVaultToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Keyvault -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
             $script:StorageToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource Storage -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
+            $script:StorageToken = Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $clientId -TenantId $TenantId -Resource GraphAPI -Permissions user_impersonation -WithLocalCaching | ForEach-Object AccessToken
         }
 
         Function resourceForm {
@@ -106,12 +107,20 @@ function azureTUI {
             }
 
             Try {
+                # In case a user keep the tool open more than an hour
+                if ($WAM) {
+                    Get-EntraToken -WAMFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation | Out-Null
+                }
+                else{
+                    Get-EntraToken -PublicAuthorizationCodeFlow -ClientId $ClientId -TenantId $TenantId -Resource ARM -Permissions user_impersonation -WithLocalCaching
+                }
+
                 $script:resources = Get-AzureResource @splat |
                     Select-Object -ExpandProperty Data |
                     Group-Object -Property Id -AsHashTable -AsString
                 $Resource_TableView.Table = $script:resources.GetEnumerator() |
                     ForEach-Object { $_.value |
-                            Select-Object id, Name, Type, Location, SubscriptionId
+                            Select-Object Name, Location, SubscriptionId, Type, Id
                         } | ConvertTo-DataTable
 
                 $StatusBar.Items[0].Title = "Updated: $(Get-Date -Format g)"
@@ -258,15 +267,16 @@ NStack $NStackVersion
         $Resource_RadioGroup.y = $Resource_btnQuery.y
         $Window.Add($Resource_RadioGroup)
         #endregion
+        #endregion
 
         #region Add a table view to display the results
         # https://gui-cs.github.io/Terminal.Gui/articles/tableview.html
         $Resource_TableView = [TableView]@{
             X            = 1
             Y            = 5
-            Width        = [Dim]::Fill()
+            Width        = [Dim]::Percent(60)
             Height       = [Dim]::Fill()
-            MaxCellWidth = 33
+            MaxCellWidth = 23
             AutoSize     = $True
         }
         #Keep table headers always in view
@@ -274,9 +284,40 @@ NStack $NStackVersion
 
         $Resource_TableView.Add_SelectedCellChanged({
                 $StatusBar.Items[3].Title = $script:resources[$Resource_TableView.Table.Rows[$Resource_TableView.SelectedRow].Id].Name
+
+                $splat = @{
+                    AccessToken     = $([Environment]::GetEnvironmentVariable('ARMToken'))
+                    ResourceId      = $($script:resources[$Resource_TableView.Table.Rows[$Resource_TableView.SelectedRow].Id].Id)
+                    ErrorAction     = 'Stop'
+                }
+
+                $Resource_Frame2_txtDetail.Text = $(Get-AzureResourceInfo @splat | Select-Object -ExpandProperty Data | ConvertTo-Json -Depth 10 | out-string)
+
+                # Send logs on the file system
+                "" | Out-File -FilePath $(Join-Path $PSScriptRoot azureTUI.txt) -Encoding UTF8 -Append
+                $Resource_Frame2_txtDetail.Text.ToString() | Out-File -FilePath $(Join-Path $PSScriptRoot azureTUI.txt) -Encoding UTF8 -Append
             })
 
         $window.Add($Resource_TableView)
+
+        $Resource_Frame2 = [FrameView]::New()
+        $Resource_Frame2.Width = [Dim]::Fill()
+        $Resource_Frame2.Height = [Dim]::Fill()
+
+        # Set position relative to frame1
+        $Resource_Frame2.X = [Pos]::Right($Resource_TableView)
+        $Resource_Frame2.Y = 5
+        $Resource_Frame2.Title = 'Resource information:'
+
+        $Resource_Frame2_txtDetail = [TextView]::New()
+        $Resource_Frame2_txtDetail.Text = 'Select a resource and details will appear here'
+        #$Resource_Frame2_txtDetail.ReadOnly = $True
+        $Resource_Frame2_txtDetail.x = 1
+        $Resource_Frame2_txtDetail.Width = [Dim]::Fill()
+        $Resource_Frame2_txtDetail.Height = [Dim]::Fill()
+
+        $Resource_Frame2.Add($Resource_Frame2_txtDetail)
+        $Window.Add($Resource_Frame2)
         #endregion
 
         #region add menus
@@ -297,6 +338,7 @@ NStack $NStackVersion
         $Black = [Color]::Black
         [Colors]::Base.Normal = [Application]::Driver.MakeAttribute($Green,$Black)
         [Colors]::Base.hotNormal = [Application]::Driver.MakeAttribute($Green,$Black)
+        [Colors]::Base.Focus = [Application]::Driver.MakeAttribute($Green,$Black)
 
         [Application]::Run()
     }
