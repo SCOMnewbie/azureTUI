@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - help menu
 - change colors
 - Add new frame with Azure resource details
+- Add export extra menu
 
 ### Changed
 

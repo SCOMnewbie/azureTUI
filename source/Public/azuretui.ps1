@@ -327,8 +327,11 @@ NStack $NStackVersion
         #$MenuItem2 = [MenuItem]::New('Keyvault', '', { KeyvaultForm })
         $MenuBarItem0 = [MenuBarItem]::New('_Options', @($MenuItem0, $MenuItem1))
 
+        $ExportJsonMenuItem = [MenuItem]::New('as JSON', '', { ExportJson })
+        $MenuBarItem1 = [MenuBarItem]::New('_Export', @($ExportJsonMenuItem))
 
-        $MenuBar = [MenuBar]::New(@($MenuBarItem0,$MenuBarItem2))
+
+        $MenuBar = [MenuBar]::New(@($MenuBarItem0,$MenuBarItem1,$MenuBarItem2))
         $Window.Add($MenuBar)
         #endregion
 
